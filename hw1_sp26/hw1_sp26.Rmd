@@ -1,0 +1,265 @@
+---
+title: "DATASCI 306, Spring 2026, Homework 1"
+author: "Your name, Your uniqname"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+This homework covers material from our first two class meetings: getting started
+with R and RMarkdown, using AI tools effectively, basic vectorized computation,
+and an introduction to plotting with `ggplot2`. 
+
+**Grading.** This homework uses a two-part grading scheme that we will use for
+the rest of the course:
+
+- **Code questions (Q1--Q5): completion.** Attempt every part in good faith. You
+  do not have to get every answer "right." Code that runs and shows you engaged
+  with the question earns full credit.
+- **Reflection: points.** The reflection at the end is graded on the substance
+  of your answers (10 points total, distributed below). This is where careful
+  thinking pays off.
+
+### Submission checklist
+
+Before submitting, confirm:
+
+- [ ] You replaced the name and uniqname in the YAML header.
+- [ ] The document knits to PDF without errors.
+- [ ] Every R chunk has been run and shows output where output is expected.
+- [ ] You answered the reflection at the bottom of the document.
+
+## Question 1: RMarkdown basics
+
+### Part a
+
+Using the `Help -> Cheatsheets -> RMarkdown Reference Guide`, demonstrate the use of the following:
+
+* Create a header called "Solution" that shows up the same size as "Question 1" above
+* Bold and italic text
+* A link that points `lsa.umich.edu/stats` 
+* A blockquote that displays these two lines from Shakespeare's Sonnet 52 as a blockquote:
+  * Blessed are you whose worthiness gives scope,
+  * Being had, to triumph, being lacked, to hope.
+* A numbered list with three elements. One element should have a sublist that is just bullet points.
+* Along with this .Rmd file there is a `um_logo.png` file. Include the image in this RMarkdown document.
+* A table that organizes the following information (good opportunity for AI assistance!):
+  * State: Michigan, Capital: Lansing, State Flower: Apple Blossom
+  * State: Ohio, Capital: Columbus, State Flower: Carnation
+  * State: Wisconsin, Capital: Madison, State Flower: Wood Violet
+
+
+### Part b
+
+The University of Michigan was founded in 1817. Create an R chunk and compute the number of years that UM has existed.
+
+Create another chunk. This time save the computation to a variable and hide the computation by setting the `include = FALSE` option in the chunk header.
+
+Use inline R to complete the following sentence (without copying and pasting your answer from the first R chunk):
+
+> The University of Michigan is YEARS years old.
+
+### Part c
+
+One nice feature of RMarkdown is that plots are included automatically. Here is a plot using a data set that comes packaged with the `ggplot2` library. It includes different diamonds with values, cuts, carat, clarity, and other features.
+
+```{r}
+ggplot(diamonds, aes(x = carat, y = price)) + geom_point()
+```
+
+Add `fig.height = X, fig.width = Y` to the chunk header, where X and Y are values you will pick for the height and width of the figure in inches. Try a few different values until you find a figure size you like. Then hide the code itself using `echo = FALSE`.
+
+## Question 2: Reading documentation and using AI
+
+### Part a
+
+**Delimited** file formats are a common way to communicate tabular data. We will talk in more detail later, but for the moment, it is sufficient to know that we read in delimited data to load tables. We will need to know the delimiter, which is the character that separates the columns. The `readr` package has a function `read_delim` that can read in delimited files.
+
+Open the help page for the `read_delim` function. Answer the following questions:
+
+- What package contains the `read_delim` function?
+- Are there any required arguments for the `read_delim` function?
+- Is the `delim` argument required? How do you know?
+- Why is there more than one function listed on this help page? What happens if you run `?read_csv` in the console?
+- Run the examples in the `read_delim` help page. Find an example that shows how to limit the columns loaded to a given set. Copy it into a code chunk and run it.
+
+### Part b: Iterating on a prompt
+
+Open [UMGPT](https://umgpt.umich.edu). The goal of this part is to practice
+*revising* a prompt, not just writing one. Think about
+
+- Context
+- Instructions
+- Content
+- Format
+
+Do the following:
+
+1. **Prompt v1.** Write a first prompt to learn more about delimited file formats. Paste the prompt and the AI's response.
+2. **Critique.** In 1--2 sentences, identify the *biggest weakness* of the response (e.g., too generic, missed your level, no examples, didn't address your actual question).
+3. **Prompt v2.** Rewrite the prompt to fix that specific weakness. Paste the new prompt and the new response.
+4. **Verdict.** Which response was more useful, and why?
+
+### Part c
+
+The `readr` package has a function `write_delim` that can write data frames to delimited files. Open the help page for the `write_delim` function to learn more about it.
+
+Use the `write_delim` function to save the table `starwars` to a file called `starwars.txt`. Make sure you do the following:
+
+- Make the argument that sets the file name be the first argument passed to the function.
+- Set the `delim` argument to a character of your choice (for example ".").
+- Set the argument that allows you to choose your own identifier for missing values. Set it to "STORM TROOPER SHOOTS" (get the joke?) and use the function to save the `starwars` table.
+
+Open the resulting file:
+
+- Report the number of rows. Verify that it is one more row (the "header row" identifying the columns) than the table in R:
+
+```{r}
+dim(starwars)
+```
+
+- Explain where your delimiter argument appears in the file. If in doubt, go back, change the delimiter and see how the resulting file changes.
+
+## Question 3: Vectorized computation
+
+Recall, the sample mean is defined as:
+
+$$ \bar X_n = \frac{1}{n} \sum_{i = 1}^n X_i$$
+
+and the sample variance is defined as
+
+$$ {\widehat{\sigma}}^2 = \frac{1}{n - 1} \sum_{i=1}^n (X_i - \bar X_n)^2$$
+
+These are often used to create Z-scores:
+
+$$Z_i = \frac{X_i - \bar X}{\widehat{\sigma}}$$
+
+### Part a
+
+Using *vectorized* computations, compute the sample mean and sample variance of
+the `displ` column of the `mpg` data set. Do not use the functions `mean` or
+`var`. You may use `length` and `sum`.
+
+```{r}
+
+```
+
+### Part b
+
+The correlation coefficient is defined as the average product of Z-scores for two different measurements:
+
+$$r_{xy} = \frac{1}{n - 1} \sum_{i=1}^n \left(\frac{X_i - \bar X}{\widehat \sigma_x}\right)  \left(\frac{Y_i - \bar Y}{\widehat \sigma_y}\right)$$
+
+Using vectorized computations, calculate the correlation of the `hwy` and `cty` columns from the `mpg` table. You may use `mean` and `sd` to calculate the sample means and standard deviations. You can check your work using the `cor` function, but you cannot use that in your solution.
+
+```{r}
+
+```
+
+## Question 4: Housing markets in Texas
+
+### Part a
+
+The `txhousing` data set contains information on home sales in different metropolitan areas of Texas.
+
+Use the `summary` function to find out what years the data covers.
+
+### Part b
+
+Compute the following quantities:
+
+- The mean number of sales per month
+- The median volume of sales per month
+- The correlation of `volume` and `median`
+
+### Part c
+
+Suppose we are interested in seasonal effects on the housing market. Here is a
+plot of median housing prices by month in Texas over the period 2000 to
+mid-2015.
+
+```{r, warning=FALSE}
+ggplot(txhousing, aes(x = month, y = median)) + geom_point() + geom_smooth()
+```
+
+What might be misleading about this plot? Refer to [Section 9.7 of R for Data
+Science](https://r4ds.hadley.nz/layers.html#coordinate-systems) to propose a better way of displaying these data. Comment on any seasonal effects you see.
+
+### Part d: AI-assisted plotting
+
+Now use an AI tool as a coding partner. Open [UMGPT](https://umgpt.umich.edu) (or another AI assistant of your choice) and ask it to help you write `ggplot2` code that answers the following question with the `txhousing` data:
+
+> How does the median sale price in Austin compare to the median sale price in Houston over time?
+
+Things to include in your response:
+
+1. **Your prompt.** Write a prompt that gives the AI enough context (what data set, what columns, what tool) to produce code that runs. Paste the prompt verbatim.
+2. **The AI's code, run in a chunk.** Copy the code the AI gave you into an R chunk and run it. If it does not run on the first try, fix it (and briefly note what you had to change).
+3. **Read your own plot.** In one sentence, answer the question: which city has the higher median price, and roughly when (if ever) did the gap between them change noticeably?
+4. **Short critique (1--2 sentences).** Did the AI pick a sensible geom? Anything you would change about the plot to make the comparison clearer?
+
+## Question 5: Detroit crime data
+
+For this question, let's look at some crime report information from the City of Detroit:
+
+```{r}
+crime <- read_csv("./data/RMS_Crime_Incidents.csv.gz", show_col_types = FALSE)
+```
+
+If you want to see the source of this data: [City of Detroit crime event data](https://data.detroitmi.gov/datasets/detroitmi::rms-crime-incidents/explore).
+
+### Part a: Getting to know the data
+
+Answer the following questions about the data set:
+
+* How many rows and columns are in this data set?
+* How many precincts are there? Hint: explore the functions `n_distinct` and `unique`
+
+### Part b: Distribution of offense category
+
+Using an appropriate plot, show the distribution of the offense category. Ensure the labels do not overlap.
+
+### Part c: Time of day
+
+Plot the number of crimes reported for each hour of the day. Color the hours from 9pm to 6am differently from the rest of the day.
+
+## Reflection (10 points)
+
+This section is graded on the substance of your answers, not on getting the
+"right" answer. Aim for a few honest sentences each --- enough that someone
+reading it could understand what you actually experienced. One-word answers
+will not earn full credit.
+
+You may use AI on this sections but do so in a way that supports your own
+thinking rather than supplants it. For example, draft a list of bullet points
+and ask an AI tool to help you expand on these ideas. Or have the tool read 
+your suggestions and ask you questions that can be used to focus your thinking.
+
+### 1. Hardest moment (3 points)
+
+Which question took the longest, or where did you get most stuck? Describe
+specifically what was confusing (a function, a concept, an error message, a
+prompt that wouldn't behave) and how you got unstuck (asked a peer, re-read
+the docs, asked an AI, gave up and moved on).
+
+### 2. AI as a collaborator (3 points)
+
+Looking at your two AI interactions in this homework (Q2b and Q4d): what did
+the AI do *well*, and where did it mislead you or produce something you had
+to fix? Based on this experience, write one rule of thumb you would give a
+friend just starting to use AI for coding.
+
+### 3. What's still fuzzy (2 points)
+
+Name one concept from the first two class meetings that you can sort of use
+but could not yet explain to someone else. Be specific.
+
+### 4. A question for class (2 points)
+
+One question you would want to ask in class about this material. It can be
+about R, RMarkdown, AI, or how any of this connects to data science more
+broadly.
