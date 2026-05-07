@@ -20,13 +20,17 @@ git clone <repo url>
 
 ## Working on a homework
 
-Each assignment lives in its own directory (e.g. `hw1_sp26/`). Open the `.Rmd`
-file in RStudio, replace the name and uniqname in the YAML header, and work
-through the questions in place.
+**Always open `datasci306_sp26.Rproj` first** (double-click it in your file
+browser, or use `File -> Open Project...` in RStudio). This sets the working
+directory to the repo root and ensures that data files load correctly on every
+operating system, including Windows.
 
-To produce the file you submit, click **Knit** in RStudio (or run
-`rmarkdown::render("hw1_sp26/hw1_sp26.Rmd")`). Submit the knitted **PDF** on
-Canvas.
+Once the project is open, navigate to the homework directory (e.g. `hw1_sp26/`)
+in the **Files** pane, open its `.Rmd` file, replace the name and uniqname in
+the YAML header, and work through the questions in place.
+
+To produce the file you submit, click **Knit** in RStudio. Submit the knitted
+**PDF** on Canvas.
 
 ## Required packages
 
@@ -49,11 +53,13 @@ Most assignments use a two-part scheme:
 
 ## Assignments
 
-- `hw1_sp26/` --- RMarkdown, AI tools, basic R, intro to plotting. Due Wed.
+- `hw1_sp26/` --- RMarkdown, AI tools, basic R, intro to plotting. Due Wed May
+  13
 
 ## Getting help
 
-- Office hours and Piazza (see Canvas for links).
-- The R help system (`?function_name`) and the [R for Data Science](https://r4ds.hadley.nz/) book.
+- Office hours and help desk (see Canvas for links).
+- The R help system (`?function_name`) and the
+  [R for Data Science](https://r4ds.hadley.nz/) book.
 - AI assistants like [UMGPT](https://umgpt.umich.edu) --- you are encouraged to
   use these as collaborators. We will talk in class about how to use them well.
