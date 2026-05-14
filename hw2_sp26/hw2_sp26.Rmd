@@ -1,0 +1,374 @@
+---
+title: "DATASCI 306, Spring 2026, Homework 2"
+author: "Your name, Your uniqname"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+aatemp <- read_csv("data/ann_arbor_weather.csv.gz", show_col_types = FALSE)
+spotify <- readr::read_csv(
+  "https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2020/2020-01-21/spotify_songs.csv",
+  show_col_types = FALSE
+) |>
+  mutate(track_album_release_year = as.numeric(substr(track_album_release_date, 1, 4))) |>
+  select(-c(track_name, track_album_name, playlist_name, track_artist, track_album_release_date))
+```
+
+This homework covers material from our second week of class: the structure
+of tables, the core `dplyr` verbs (`filter`, `select`, `mutate`,
+`group_by`, `summarize`, `arrange`), grouped transformations, and
+multi-level aggregation, plus more practice with `ggplot2`.
+
+**The data.** Two data sets:
+
+1. A record of daily weather observations from a station in Ann Arbor,
+   Michigan (`aatemp`), used in Question 1.
+2. A modified version of the
+   [2020-01-21 TidyTuesday](https://github.com/rfordatascience/tidytuesday)
+   Spotify songs data set, used in Questions 2--7. A description of each
+   column is at the
+   [TidyTuesday README](https://github.com/rfordatascience/tidytuesday/blob/main/data/2020/2020-01-21/readme.md).
+   This version converts `track_album_release_date` to
+   `track_album_release_year` and drops a few text-heavy columns.
+
+```{r, results = "hide"}
+colnames(spotify)
+```
+
+**Grading.** Same scheme as Homework 1:
+
+- **Code questions (Q1--Q7): completion.** Attempt every part in good
+  faith. Code that runs and shows you engaged with the question earns full
+  credit.
+- **Reflection: points.** The reflection at the end is graded on the
+  substance of your answers (10 points total). This is where careful
+  thinking pays off.
+
+### Submission checklist
+
+Before submitting, confirm:
+
+- [ ] You replaced the name and uniqname in the YAML header.
+- [ ] The document knits to PDF without errors.
+- [ ] Every R chunk has been run and shows output where output is expected.
+- [ ] You answered the reflection at the bottom of the document.
+
+## Question 1: Getting to know a table (Ann Arbor weather)
+
+We'll start with the `aatemp` table. The columns we will work with most
+are:
+
+- `DATE` --- date of the observation
+- `TMAX`, `TMIN` --- the day's maximum and minimum temperatures (deg. F)
+- `PRCP` --- precipitation (inches)
+- `SNOW`, `SNWD` --- snowfall and snow depth (inches)
+
+### Part a: Rows, columns, names
+
+Report the number of rows and the number of columns in `aatemp`. Then list
+all column names. (Hint: `nrow`, `ncol`, `colnames`.)
+
+```{r}
+
+```
+
+### Part b: First and last observations
+
+Show the first 5 rows and the last 5 rows of `aatemp`. What is the earliest
+date in the data? What is the latest?
+
+```{r}
+
+```
+
+### Part c: Built-in summary
+
+Run `summary` on `aatemp`. Use the output to answer:
+
+- What was the highest `TMAX` ever observed in this record?
+- What was the lowest `TMIN`?
+- How many missing values are there in the `SNOW` column?
+
+```{r}
+
+```
+
+### Part d: Targeted summaries
+
+Without using `summary`, compute the mean, median, and standard deviation
+of `TMAX`. Then compute the *proportion* of days in the record that had any
+measurable precipitation (`PRCP > 0`). (Hint: the mean of a logical vector
+is the proportion of `TRUE` values; remember `na.rm = TRUE`.)
+
+```{r}
+
+```
+
+## Question 2: Filtering to a recent date range (Spotify)
+
+Filter the Spotify data set to include only songs with
+`track_album_release_year` between 1990 and 2019 (inclusive). Save the
+filtered results into a new table called `spotify2`. This filtered table
+will be used for the remainder of the assignment.
+
+Using `spotify2`, determine the number of songs released in each year.
+
+```{r}
+
+```
+
+## Question 3: Trends in song genres over time
+
+After completing Question 2, enable the following code chunk by setting
+`eval = TRUE`:
+
+```{r eval = FALSE}
+table(spotify2$playlist_genre)
+```
+
+Group `spotify2` by `track_album_release_year` and `playlist_genre`, and
+count the number of songs released for each genre in each year. Using
+these results, create a line plot where each genre is represented by a
+separate line, showing how the number of released songs for each genre has
+changed over time.
+
+Based on the graph, identify which genre has shown the most significant
+increase over the years.
+
+```{r}
+
+```
+
+## Question 4: `mutate` on the whole table
+
+The `cut` function breaks a quantitative variable into discrete
+categories. Here is an example:
+
+```{r}
+x <- c(2, 0, 5, 10, 3, 4, -0.25, 6)
+cut(x, breaks = c(-Inf, 0, 5, Inf), labels = c("Small", "Medium", "Large"))
+```
+
+The notation `(a, b]` means a half-open interval defined by $a < x \le b$.
+
+### Part a: Energy groups
+
+Using `cut` inside a single call to `mutate`, add a new column
+`energy_group` to `spotify2` that breaks `energy` into the following
+groups:
+
+* Low Energy: `(0, 0.25]`
+* Medium Low Energy: `(0.25, 0.5]`
+* Medium High Energy: `(0.5, 0.75]`
+* High Energy: `(0.75, 1]`
+
+```{r}
+
+```
+
+### Part b: Several new columns at once
+
+In a single call to `mutate`, add the following additional columns to
+`spotify2` (keep the `energy_group` column from Part a):
+
+- `decade`: the decade of release, as a character string (`"1990s"`,
+  `"2000s"`, `"2010s"`). One way: `paste0(10 * (year %/% 10), "s")`.
+- `duration_min`: the song's duration in minutes (`duration_ms / 60000`).
+- `loud_per_min`: `loudness` divided by `duration_min`.
+
+Show the first few rows of `spotify2` to confirm all three new columns
+appear alongside `energy_group`. Save the updated `spotify2` so the new
+columns are available for later questions.
+
+```{r}
+
+```
+
+### Part c: A summary using the new columns
+
+Using `group_by` and `summarize`, compute the count of songs in each
+`energy_group`. Which energy level is most common? (Hint: `n()`.)
+
+```{r}
+
+```
+
+## Question 5: Aggregating at more than one level
+
+In this question you will summarize the data at two different levels of
+grouping --- first by `playlist_subgenre` and year, then collapsing the
+result up to `playlist_subgenre` and `playlist_genre`.
+
+### Part a: Year-by-subgenre counts
+
+Group `spotify2` by `playlist_subgenre` and `track_album_release_year`,
+and use `n()` to count the songs released in each subgenre in each year.
+Save this result as `by_subgenre_year`.
+
+```{r}
+
+```
+
+### Part b: Average yearly releases per subgenre
+
+Starting from `by_subgenre_year`, group by `playlist_subgenre` only and
+compute the average number of songs released per year for each subgenre.
+Arrange in descending order and report the top three subgenres.
+
+```{r}
+
+```
+
+### Part c: One level up --- to genre
+
+For each `playlist_genre`, compute *both* the average yearly release count
+across the subgenres in that genre *and* the number of distinct subgenres
+in the genre. You may start from your Part b result or build a fresh
+pipeline. (Hint: `n_distinct` is useful.)
+
+Arrange the result by descending average yearly releases.
+
+```{r}
+
+```
+
+## Question 6: `mutate` *within* groups
+
+Sometimes you want to compute a per-group summary but keep the row-level
+structure of the table. This is what grouped `mutate` does: unlike
+`summarize`, `mutate` keeps every row, but the summary value is computed
+*within* each group and broadcast to every row of the group.
+
+### Part a: Genre-relative popularity
+
+For each song in `spotify2`, compute its popularity *relative to the
+average popularity of its genre*. Specifically, add a new column
+`popularity_vs_genre` defined as
+
+$$
+\texttt{popularity\_vs\_genre} = \texttt{track\_popularity}
+  - \overline{\texttt{track\_popularity}}_{\text{ genre}}
+$$
+
+using `group_by(playlist_genre)` together with `mutate`. Don't forget to
+`ungroup()` afterwards.
+
+```{r}
+
+```
+
+### Part b: Most over-performing song per genre
+
+Using your new column, find the single song in each genre with the
+*largest* positive `popularity_vs_genre`. Report the genre, the subgenre,
+the track id, the raw `track_popularity`, and `popularity_vs_genre`. (Hint:
+`slice_max`.)
+
+```{r}
+
+```
+
+### Part c: A check
+
+For each genre, what is the average of `popularity_vs_genre`? Briefly
+explain (one sentence) why your answer makes sense.
+
+```{r}
+
+```
+
+> *Your explanation here.*
+
+## Question 7: What makes a genre "danceable"? (AI as collaborator)
+
+In this question you will explore how `danceability` relates to other
+audio features --- specifically `energy`, `tempo`, and `valence` ---
+across different genres, *with an AI assistant as a coding partner*.
+
+The end goal is:
+
+1. For each genre, compute the correlation between `danceability` and each
+   of `energy`, `tempo`, and `valence`.
+2. Display the result as a single visualization that makes comparison
+   across genres and across the three audio features easy to read.
+
+### Part a: Your prompt
+
+Open [UMGPT](https://umgpt.umich.edu) (or another AI assistant of your
+choice). Write a prompt that gives the AI enough context to produce code
+that runs against `spotify2`. Your prompt should:
+
+- name the data set and the relevant columns,
+- state both the calculation and the visualization goal clearly,
+- ask for tidyverse code (`dplyr` + `ggplot2`), not a general explanation.
+
+Paste your prompt verbatim below.
+
+> *Your prompt here.*
+
+### Part b: The AI's code
+
+Paste the code the AI produced into the chunk below and run it. If it does
+not run as-is, fix it, and briefly note what you had to change. (You do
+not need to keep the AI's narration --- just the code.)
+
+```{r}
+
+```
+
+### Part c: Your interpretation
+
+In two or three sentences, answer the original question: what combination
+of features seems to make a song danceable, and does that combination
+differ across genres? Refer to specific numbers or specific features of
+your plot.
+
+> *Your answer here.*
+
+### Part d: Critique
+
+In one or two sentences, evaluate the AI's code. Did it pick reasonable
+`dplyr` verbs? Did its visualization make the comparison easy, or would
+you change the geom, color mapping, or layout? What would you do
+differently if you redid this from scratch?
+
+> *Your critique here.*
+
+## Reflection (10 points)
+
+This section is graded on the substance of your answers, not on getting
+the "right" answer. Aim for a few honest sentences each --- enough that
+someone reading it could understand what you actually experienced.
+One-word answers will not earn full credit.
+
+You may use AI on this section, but do so in a way that supports your own
+thinking rather than supplants it.
+
+### 1. Hardest moment (3 points)
+
+Which question took the longest, or where did you get most stuck?
+Describe specifically what was confusing (a verb, a concept, an error
+message, a prompt that wouldn't behave) and how you got unstuck.
+
+### 2. `summarize` vs. grouped `mutate` (3 points)
+
+Question 5 used `summarize` to collapse the table to one row per group.
+Question 6 used `mutate` to add a per-group value to *every* row. In your
+own words, when would you reach for one rather than the other? Give a
+concrete example (it does not have to be from this homework).
+
+### 3. What's still fuzzy (2 points)
+
+Name one concept from this week (multi-level aggregation, grouped
+`mutate`, `cut`, line plots over time, etc.) that you can sort of use but
+could not yet explain to someone else. Be specific.
+
+### 4. A question for class (2 points)
+
+One question you would want to ask in class about this material. It can
+be about `ggplot2`, `dplyr`, your AI interaction in Q7, or how any of
+this connects to data science more broadly.
