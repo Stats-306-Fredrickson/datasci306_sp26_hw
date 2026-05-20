@@ -1,0 +1,155 @@
+---
+title: "DATASCI 306, Spring 2026, Homework 3"
+author: "Your name, Your uniqname"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(Lahman)
+aatemp <- read_csv("data/ann_arbor_weather.csv.gz", show_col_types = FALSE)
+```
+
+This homework covers material from Lectures 7, 8, and 12: writing and
+composing functions, `across`, predicates, anonymous functions, curly-brace
+`{{}}` column arguments, variable-length `...` arguments, lexical scoping,
+table types, loading delimited data, and working with dates using `lubridate`.
+
+**Grading.** Same scheme as previous homeworks:
+
+- **Code questions (Q1--Q3): completion.** Attempt every part in good faith.
+  Code that runs and shows you engaged with the question earns full credit.
+- **Reflection: points.** The reflection at the end is graded on the
+  substance of your answers (10 points total).
+
+### Submission checklist
+
+Before submitting, confirm:
+
+- [ ] You replaced the name and uniqname in the YAML header.
+- [ ] The document knits to PDF without errors.
+- [ ] Every R chunk has been run and shows output where output is expected.
+- [ ] You answered the reflection at the bottom of the document.
+
+## Question 1: Detecting and visualizing outliers
+
+The functions you write below will use a threshold `k` — the number of
+standard deviations beyond which a value is considered an outlier — from
+the surrounding environment rather than as a function argument.
+
+### Part a
+
+Compute `k` as the 99th percentile of the absolute Z-scores across all
+numeric columns of `aatemp`. Use `scale` (which standardizes a matrix
+column-by-column), then take absolute values and call `quantile`. Print `k`.
+
+Then write a function `is_outlier(x)` that returns a logical vector the
+same length as `x`: `TRUE` where a value is more than `k` standard
+deviations from the mean of `x`, and `FALSE` otherwise. Use `na.rm = TRUE`
+when computing the mean and standard deviation.
+
+Using `aatemp`, add an `outlier` column with `mutate` and make a scatter
+plot of `PRCP` over `DATE`, with the color of each point determined by
+whether it is an outlier.
+
+```{r}
+
+```
+
+### Part b
+
+Write a predicate `has_outlier(x)` that returns a single `TRUE` or `FALSE`
+indicating whether `x` contains at least one outlier. (Hint: use
+`is_outlier` and `any`; handle `NA`s carefully.)
+
+Use `has_outlier` with `where` inside `select` to find which numeric columns
+of `aatemp` contain at least one outlier. Report the column names.
+
+```{r}
+
+```
+
+### Part c
+
+Write a function `plot_col(tbl, col)` that takes a data frame and a column
+name (using `{{col}}` curly-brace syntax). Inside the function:
+
+- Extract the column's values with `pull` and call `has_outlier` on them.
+- **If the column has outliers:** produce a histogram where the fill color
+  indicates whether each observation is an outlier.
+- **If the column has no outliers:** produce a density plot.
+
+Demonstrate by calling `plot_col` on `PRCP` (which has outliers) and on
+`TMAX` (which does not).
+
+```{r}
+
+```
+
+## Question 2: Loading data and working with dates
+
+The CDC publishes monthly counts of cancer deaths broken down by type and
+demographic group. The file
+`AH_Provisional_Cancer_Death_Counts_by_Month_and_Year__2020-2021.csv.gz`
+is in your `data/` folder. Each row covers one reporting period: the three
+date columns `Data As Of`, `Start Date`, and `End Date` are stored as
+`MM/DD/YYYY` strings.
+
+### Part a
+
+Read the file into a tibble called `cancer_deaths`. Use `col_types` and
+`col_date("%m/%d/%Y")` to parse all three date columns directly on load.
+Confirm the column types look correct by printing the first few rows.
+
+```{r}
+
+```
+
+### Part b
+
+Using the date columns you just loaded, answer the following with
+`lubridate`:
+
+1. What is the full time span of the data set, from the earliest `Start
+   Date` to the latest `End Date`? Report it in months.
+2. How long is each individual reporting period (`End Date - Start Date`
+   in days)? Are all periods the same length, or does it vary?
+3. Do any `Start Date` values fall on a day of the week other than Sunday?
+   (Use `wday`.)
+
+```{r}
+
+```
+
+## Reflection (10 points)
+
+This section is graded on the substance of your answers, not on getting the
+"right" answer. Aim for a few honest sentences each. One-word answers will
+not earn full credit.
+
+### 1. Hardest moment (3 points)
+
+Which part of this homework took the longest, or where did you get most
+stuck? Describe specifically what was confusing and how you got unstuck.
+
+### 2. Building functions in layers (3 points)
+
+In Question 1 you wrote `is_outlier`, then built `has_outlier` on top of
+it, then built `plot_col` on top of that. In one or two sentences, describe
+one advantage of this layered approach compared to writing a single function
+that does everything at once.
+
+### 3. Dates in data (2 points)
+
+In Question 2, the date columns in the cancer deaths file were stored as
+strings and had to be parsed with a format string. Name one thing that can
+go wrong if you skip this step and just leave dates as character columns.
+
+### 4. A question for class (2 points)
+
+One question you would want to ask in class about function writing, date
+handling, or anything else from this homework.
