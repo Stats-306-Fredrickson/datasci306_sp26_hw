@@ -1,0 +1,298 @@
+---
+title: "DATASCI 306, Spring 2026, Homework 4"
+author: "Your name, Your uniqname"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(Lahman)
+```
+
+This homework covers material from Lectures 13, 14, and the set-operations
+portion of Lecture 15: tidy vs. wide data, `pivot_longer`/`pivot_wider`,
+relational data, primary and foreign keys, mutating joins (left/right/full/
+inner), filtering joins (`semi_join`, `anti_join`), compound keys, natural
+joins, and the base R set-operation functions (`intersect`, `union`,
+`setdiff`, `setequal`, `%in%`).
+
+**Grading.** Same scheme as previous homeworks:
+
+- **Code questions (Q1--Q3): completion.** Attempt every part in good faith.
+  Code that runs and shows you engaged with the question earns full credit.
+- **Reflection: points.** The reflection at the end is graded on the
+  substance of your answers (10 points total).
+
+### Submission checklist
+
+Before submitting, confirm:
+
+- [ ] You replaced the name and uniqname in the YAML header.
+- [ ] The document knits to PDF without errors.
+- [ ] Every R chunk has been run and shows output where output is expected.
+- [ ] You answered the reflection at the bottom of the document.
+
+## Question 1: Pivoting cancer death counts
+
+You loaded the CDC's monthly cancer-death file in Homework 3. Here we will
+reshape it and answer some questions about it. The same file lives in this
+homework's `data/` folder; load it the same way you did before.
+
+```{r}
+cancer_deaths <- read_csv(
+  "data/AH_Provisional_Cancer_Death_Counts_by_Month_and_Year__2020-2021.csv.gz",
+  col_types = cols(
+    "Data As Of" = col_date("%m/%d/%Y"),
+    "Start Date" = col_date("%m/%d/%Y"),
+    "End Date"   = col_date("%m/%d/%Y")
+  ),
+  show_col_types = FALSE
+) |>
+  select(-`Malignant neoplasms (C00-C97)`)
+```
+
+The `Malignant neoplasms (C00-C97)` column is a total across all cancer
+types and has been dropped above so the remaining cancer columns sum to a
+sensible total.
+
+Because the cancer-type column names are very long, you may find it useful
+to print tables with `knitr::kable`, e.g.
+
+```{r}
+select(cancer_deaths, 1:5) |> head(5) |> knitr::kable()
+```
+
+### Part a — Tidy the data with `pivot_longer`
+
+Each row of `cancer_deaths` is a (reporting period, demographic) combination,
+and each of the many cancer-type columns holds a count. That is *wide*
+format: the cancer type is encoded in the column name rather than living in
+a column of its own.
+
+Use `pivot_longer` to reshape `cancer_deaths` so there is one row per
+(reporting period, demographic, cancer type) with the death count in a
+single `deaths` column. The non-cancer columns (dates, sex, race, age group,
+etc.) should be carried along untouched. Call the result `cancer_tidy` and
+give the new columns informative names (e.g. `cancer_type` and `deaths`).
+
+Hint: see the `tidy-select` helpers — `where(is.numeric)` or a `-c(...)`
+selection of the columns you do *not* want to pivot are both reasonable.
+
+```{r}
+
+```
+
+### Part b — Summaries that are easier on the tidy version
+
+Using `cancer_tidy`, answer the following. Each part should be a short
+`group_by` / `summarize` / `filter` pipeline.
+
+1. How many cancer deaths are recorded in this data set in total?
+2. Group by `End Date` (the end of the reporting period) and compute the
+   total deaths in each month. Which month had the most deaths?
+3. Restrict to the following five cancer types and graph total monthly
+   deaths over time, with one line per cancer type. (The hint
+   `theme(legend.position = "bottom")` keeps the long category names from
+   crowding the plot.)
+
+```{r}
+cancer_type_subset <- c(
+  "Malignant neoplasms of trachea, bronchus and lung (C33-C34)",
+  "All other and unspecified malignant neoplasms (C17,C23-C24,C26-C31,C37-C41,C44-C49,C51-C52,C57-C60,C62-C63,C66,C68-C69,C73-C80,C97)",
+  "Malignant neoplasms of lymphoid, hematopoietic and related tissue (C81-C96)",
+  "Malignant neoplasms of colon, rectum and anus (C18-C21)",
+  "Malignant neoplasm of pancreas (C25)"
+)
+```
+
+```{r}
+
+```
+
+### Part c — Sparse vs. dense
+
+Many (period, demographic, cancer type) combinations had zero recorded
+deaths. If we agreed to treat *missing* rows as zero, we could drop those
+rows entirely.
+
+- How many rows does `cancer_tidy` have? How many of those rows have
+  `deaths == 0`?
+- Build `cancer_tidy_sparse` by filtering out the zero-death rows. What
+  percentage smaller is the sparse version than the full tidy table?
+- Using `cancer_tidy_sparse`, report the top 5 cancer types by total
+  deaths across the whole data set.
+
+```{r}
+
+```
+
+### Part d — Faceted percentages by age group
+
+Using `cancer_tidy_sparse` restricted to the five cancer types in
+`cancer_type_subset`, build a faceted bar plot showing, for each `Age
+Group`, the *percentage* of deaths from those five cancers attributable
+to each individual cancer type. (In other words: within each age-group
+facet, the five bars should sum to 100%.)
+
+Facet by `Age Group`. The cancer-type strings are very long — make a
+short label for each (e.g. `"Lung"`, `"Lymphoid"`, `"Pancreas"`, …) so
+the x-axis is readable. Briefly note one age group whose pattern looks
+unlike the others, and which cancer type drives the difference.
+
+```{r}
+
+```
+
+## Question 2: Joining `Lahman` tables
+
+For this question we will use the `Lahman` package, which mirrors Sean
+Lahman's baseball database. The tables you'll need are:
+
+- `People` — one row per player (`playerID`, `nameFirst`, `nameLast`, …)
+- `Batting` — one row per player-year-stint of batting statistics
+- `Teams` — one row per team-year (`yearID`, `lgID`, `teamID`, team stats)
+- `HallOfFame` — voting results, one row per (player, year, ballot type);
+  `inducted == "Y"` means the player was elected
+- `AwardsPlayers` — one row per player-award-year
+
+(Quick sanity check: the *primary key* for `Batting` is
+`(playerID, yearID, stint)`, since a player can switch teams mid-season
+and pick up a new `stint`.)
+
+### Part a — Mutating join with `left_join`
+
+Compute career home runs for every player by grouping `Batting` on
+`playerID` and summing `HR`. Sort descending and keep the top 10. Then
+attach the player's first and last name from `People` using `left_join`,
+and print the result so the names are visible.
+
+```{r}
+
+```
+
+### Part b — Joining on a compound key
+
+Each row of `Batting` belongs to a (player, year, team, league) row in
+`Teams`. The shared key here is the *compound key*
+`(yearID, lgID, teamID)`.
+
+Use `inner_join` to attach each batter's *team* HR total (call it
+`team_HR`) to their `Batting` row on that compound key. Compute each
+player-year's share of their team's home runs (`HR / team_HR`).
+
+To keep the question modern (early baseball had tiny HR totals where one
+player hitting one homer was the whole team's output), restrict to
+seasons where `team_HR >= 100`. Among those, find the 5 player-years with
+the *highest* personal share of the team's home runs, and attach the
+player's name via `People`.
+
+```{r}
+
+```
+
+### Part c — Filtering join with `semi_join`
+
+Let `hof` be the distinct `playerID`s in `HallOfFame` where
+`inducted == "Y"`. Use `semi_join` to keep only the rows of `Batting`
+that belong to a Hall-of-Fame player. Report:
+
+- the number of `Batting` rows that survived,
+- the number of distinct Hall-of-Fame players who actually have a
+  batting record.
+
+```{r}
+
+```
+
+### Part d — Filtering join with `anti_join`
+
+Not every Hall-of-Fame inductee was a batter — the HoF also honors
+managers, umpires, and executives. Use `anti_join` to find the
+inductees in `hof` who have *no* row in `Batting`. How many are there?
+
+Attach `nameFirst`, `nameLast` from `People` and `category` from
+`HallOfFame` to the result, then summarize: how many HoF inductees with
+no batting record fall into each `category`?
+
+```{r}
+
+```
+
+## Question 3: Set operations
+
+### Part a — On vectors
+
+From `AwardsPlayers`, build two vectors of distinct `playerID`s:
+
+- `mvp_ids` — players who have won `"Most Valuable Player"`,
+- `cy_ids`  — players who have won `"Cy Young Award"`.
+
+Use base R set operations to answer:
+
+- How many players have won *both* awards (`intersect`)? Look up their
+  full names in `People` and print the list — you should recognize some.
+- How many distinct players have won *either* award (`union`)?
+- How many players have won MVP but *not* a Cy Young (`setdiff`)?
+- Is `"ruthba01"` (Babe Ruth) in `mvp_ids`? Use `%in%`.
+
+```{r}
+
+```
+
+### Part b — On tables
+
+Set operations on tables compare rows: two rows are "the same" only if
+*all* their column values match.
+
+Build two small tables of `(playerID, yearID)` pairs:
+
+- `as_pairs`  — every distinct (`playerID`, `yearID`) appearing in
+  `AllstarFull`,
+- `mvp_pairs` — every (`playerID`, `yearID`) where the player won
+  `"Most Valuable Player"` that year.
+
+Use `intersect`, `union`, and `setdiff` on these tables to answer:
+
+- How many MVP seasons were *also* All-Star seasons for the same player
+  (`intersect`)?
+- How many distinct (player, year) pairs appear in *either* table
+  (`union`)?
+- How many MVPs were *not* All-Stars in the year they won
+  (`setdiff(mvp_pairs, as_pairs)`)? What might explain those cases?
+
+```{r}
+
+```
+
+## Reflection (10 points)
+
+This section is graded on the substance of your answers, not on getting the
+"right" answer. Aim for a few honest sentences each. One-word answers will
+not earn full credit.
+
+### 1. Hardest moment (3 points)
+
+Which part of this homework took the longest, or where did you get most
+stuck? Describe specifically what was confusing and how you got unstuck.
+
+### 2. Wide vs. tidy (3 points)
+
+In Question 1 you took a wide table with one column per cancer type and
+pivoted it to a tidy table with one row per (period, demographic, cancer
+type). Name one task that was easier *after* pivoting, and one situation
+where you might prefer to keep the original wide layout.
+
+### 3. Choosing a join (2 points)
+
+In Question 2 you used a `left_join`, an `inner_join`, a `semi_join`, and
+an `anti_join`. In a sentence or two, describe how you decide which one
+to reach for. What question are you really asking when you pick
+`semi_join` over `inner_join`?
+
+### 4. A question for class (2 points)
+
+One question you would want to ask in class about pivoting, joins, or set
+operations.
