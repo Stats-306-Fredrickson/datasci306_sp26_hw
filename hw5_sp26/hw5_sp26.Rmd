@@ -1,0 +1,338 @@
+---
+title: "DATASCI 306, Spring 2026, Homework 5"
+author: "Your name, Your uniqname"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+This homework covers material from Lectures 17, 18, and 19: applying
+**regular expressions** to select, detect, and extract text
+(`matches`, `str_detect`, `str_extract_all`, alternation, backreferences);
+**factors** with the `forcats` package
+(`factor`, `levels`, `fct_infreq`, `fct_reorder`, `fct_collapse`,
+`fct_lump_n`); and **iteration** with `for`/`while` loops and the
+`purrr` `map` family (`map`, `map_*`, `map2_*`, the `~ .x` formula
+shorthand, `safely`, and `transpose`).
+
+**Grading.** Same scheme as previous homeworks:
+
+- **Code questions (Q1--Q3): completion.** Attempt every part in good
+  faith. Code that runs and shows you engaged with the question earns
+  full credit.
+- **Reflection: points.** The reflection at the end is graded on the
+  substance of your answers (10 points total).
+
+### Submission checklist
+
+Before submitting, confirm:
+
+- [ ] You replaced the name and uniqname in the YAML header.
+- [ ] The document knits to PDF without errors.
+- [ ] Every R chunk has been run and shows output where output is expected.
+- [ ] You answered the reflection at the bottom of the document.
+
+## Question 1: Regular expressions on congressional tweets
+
+The U.S. Congress is seated in two-year periods; the 115th Congress sat
+in 2017--2018. Researchers at UM's School of Information collected the
+tweets that sitting members of Congress (MoCs) posted during this period
+and flagged which were **retweets** of other accounts. We will work with
+a sample of that retweet data. (The full text of each retweet is in the
+`full_text` column.)
+
+```{r}
+retweets <- read_csv(
+  "data/retweets_congress_115th_sample.csv.gz",
+  col_types = cols(created_at = col_datetime()),
+  show_col_types = FALSE
+)
+dim(retweets)
+retweets |> select(user_screen_name, chamber, party, full_text) |> head(3)
+```
+
+### Part a --- Selecting columns with a name regex
+
+In Lecture 17 we used `matches()` to pick columns whose **name** fits a
+regular expression. Three columns describe the retweet relationship --- the
+original account and its reach: `retweet_count`, `rt_screen_name`, and
+`rt_followers_count`. Using `select(retweets, matches(...))` with a single
+regex, select **exactly** these three columns and report their names.
+
+
+```{r}
+
+```
+
+### Part b --- Detecting a pattern with `str_detect`
+
+The [American Health Care Act](https://en.wikipedia.org/wiki/American_Health_Care_Act_of_2017)
+(AHCA) was the 2017 bill to partly repeal the Affordable Care Act (ACA).
+Tweets about it used the hashtags `#AHCA` and `#ACA`.
+
+Write a **single** regular expression and use `str_detect` to add a
+logical column `health_bill` that is `TRUE` when `full_text` contains
+either `#AHCA` or `#ACA`. How many tweets match?
+
+Then group the matching tweets by month and report which month had the
+most. *Hint: `floor_date(created_at, "month")` collapses a timestamp to
+the first of its month; alternation `#(AHCA|ACA)` matches either hashtag.*
+
+```{r}
+
+```
+
+### Part c --- Extracting all matches with `str_extract_all`
+
+A hashtag is a `#` followed by one or more letters (`#[A-Za-z]+`). Use
+`str_extract_all` to pull **every** hashtag out of `full_text`, `unlist`
+the result into one character vector, lower-case it, and report the 10
+most common hashtags. (`str_extract` would only give the first hashtag in
+each tweet --- you want all of them.)
+
+```{r}
+
+```
+
+### Part d --- Building a pattern with a backreference
+
+We will find tweets with an accidental doubled word --- a stray "the the"
+or an emphatic "very very". Rather than give you the finished pattern,
+here are the pieces to assemble.
+
+Remember that in an R string every regex backslash must be **doubled**: you
+write `"\\w"` in your code for the regex `\w`. The pieces:
+
+- `\\w+` --- one or more **word characters** (letters, digits, or `_`).
+- `(...)` --- a **capturing group**: parentheses remember the text they
+  matched so you can refer to it later. Wrapping the word as `(\\w+)`
+  captures it as group 1.
+- `\\1` --- a **backreference**: it refers back to whatever group 1
+  captured, i.e. *the same word again*. This is the piece that makes the
+  pattern look for a repeat rather than just any two words.
+- `\\s+` --- one or more **whitespace** characters (the gap between the
+  two words).
+- `\\b` --- a **word boundary** (the edge between a word and a non-word
+  character), so you match whole words and not fragments of longer ones.
+
+Combine these into a single pattern that matches a word, then whitespace,
+then that **same** word repeated, with a word boundary on each end. Then
+use `str_detect` to count how many tweets contain an immediately repeated
+word, and print a few with `str_subset`.
+
+*Hints: the order of the pieces is boundary, captured word, whitespace,
+backreference, boundary. Wrap your finished pattern in*
+`regex(your_pattern, ignore_case = TRUE)` *so that "The the" also counts.*
+
+```{r}
+
+```
+
+## Question 2: Factors and the WikiArt-Emotions data
+
+The WikiArt-Emotions data set (the one from lecture) records, for each
+work of art, average annotator ratings of how strongly the piece evokes
+each of 20 emotions, under three viewing conditions. The chunk below
+loads it and reshapes it into the tidy long form you saw in lecture ---
+you do **not** need to change it.
+
+```{r}
+wikiart <- read_tsv("data/WikiArt-Emotions-All.tsv.gz", show_col_types = FALSE) |>
+  mutate(Year = suppressWarnings(as.numeric(str_sub(Year, 1, 4))))
+
+wa_long <- wikiart |>
+  pivot_longer(
+    matches(":"),
+    names_to  = c("rating_type", "emotion"),
+    names_sep = ":",
+    values_to = "mean_annotation"
+  ) |>
+  mutate(emotion = str_replace(emotion, "\\s", ""))
+
+select(wa_long, ID, Title, rating_type, emotion, mean_annotation)
+```
+
+### Part a --- The strongest emotion per piece
+
+For each work of art, we want the single emotion rated most strongly
+under the `"Art (image+title)"` viewing condition. Starting from
+`wa_long`:
+
+- keep only rows whose `rating_type` mentions `"Art"` (use `str_detect`),
+- group by `ID`, and for each piece keep the `emotion` with the largest
+  `mean_annotation` (the `arrange(desc(...))` + `first()` trick from
+  lecture). Call the result `wa_strong`, with columns `ID`, `strongest`,
+  and `strongest_val`.
+
+Then make a bar chart of how often each emotion is the strongest, with
+the bars ordered from most to least common. *Hint: `fct_infreq` orders a
+factor by frequency.*
+
+```{r}
+
+```
+
+### Part b --- Lumping a long tail with `fct_lump_n`
+
+The bar chart in part a has a long tail: many emotions are the strongest
+for only a handful of pieces. The `forcats` package has a family of
+`fct_lump_*` functions for exactly this situation --- folding rare levels
+together into a single catch-all. We did not see these in lecture, so take
+a look at the help page with `?fct_lump_n` first.
+
+Use `fct_lump_n` to keep the **6** most common strongest-emotions and
+collapse every other emotion into a single `"Other"` level. Add this as a
+new column `emo_lumped` on `wa_strong` and report the count of pieces per
+level. Roughly what fraction of pieces land in `"Other"`?
+
+```{r}
+
+```
+
+### Part c --- Reordering by a summary with `fct_reorder`
+
+Do more highly rated works tend toward particular emotions? Join the
+overall `Ave. art rating` column from `wikiart` onto `wa_strong` (by
+`ID`), then for each `strongest` emotion compute the mean art rating.
+
+Make a dot plot (`geom_point`) of mean art rating by emotion, with the
+emotions **ordered by their mean rating** using `fct_reorder`. Which
+emotion has the highest mean art rating, and which the lowest?
+
+```{r}
+
+```
+
+### Part d --- Extracting and lumping a messy category
+
+The `Category` column packs one or more art styles into a single
+comma-separated string (e.g. `"Abstract Art,Cubism"`). Use a regular
+expression with `str_extract` to pull out just the **primary** (first)
+style --- everything up to the first comma --- into a new column
+`primary_style`. *Hint:* `"^[^,]+"` matches the run of non-comma
+characters at the start of the string.
+
+There are many distinct styles, but this collection is fairly balanced
+(roughly 200 works per style). So instead of keeping a fixed number of
+levels, use `fct_lump_min` to lump together any style appearing fewer
+than **150** times into `"Other"`, and report the counts per lumped
+style. Which styles were rare enough to be lumped?
+
+```{r}
+
+```
+
+## Question 3: Iteration and the `map` family
+
+### Part a --- A `for` loop over columns
+
+The `ggplot2::mpg` table (loaded with the tidyverse) has columns of
+mixed type. Using a `for` loop --- **not** `map` --- build a named
+character vector `col_classes` giving the `class` of each column of
+`mpg`. Pre-allocate the storage with `vector("character", ncol(mpg))`
+and loop with `seq_along`. (Recall a table is a list of columns, so
+`mpg[[i]]` is the i-th column.)
+
+```{r}
+
+```
+
+### Part b --- The same thing with `map`, plus a custom summary
+
+1. Reproduce part a in a single line using `map_chr`.
+2. Write a function `col_summary(x)` that returns a short string: for a
+   **numeric** column, the rounded mean (e.g. `"num: mean=3.5"`); for any
+   other column, the number of distinct values (e.g. `"cat: 7 levels"`).
+   Use `map_chr` to apply it to every column of `mpg`.
+
+```{r}
+
+```
+
+### Part c --- Mapping over a list of samples
+
+A **compound random variable** draws a random sample size and then draws
+that many values. The function below returns a list of `n` numeric
+vectors of varying lengths:
+
+```{r}
+r_pois_norm <- function(n, lambda = 1, mu = 0, sd = 1) {
+  replicate(n, {
+    n_i <- rpois(1, lambda) + 1
+    rnorm(n_i, mu, sd)
+  })
+}
+
+set.seed(306)
+samples <- r_pois_norm(6, lambda = 8)
+```
+
+Using the `map` family (and the `~ .x` formula shorthand where handy):
+
+1. report the length of each sample as an integer vector (`map_int`);
+2. report the largest **absolute** value within each sample as a numeric
+   vector (`map_dbl`);
+3. for a second list of samples `samples_y` (built below), compute the
+   mean ratio `.x / .y` within each pair of samples using `map2_dbl`.
+
+```{r}
+samples_y <- map(samples, ~ runif(length(.x)))
+```
+
+```{r}
+
+```
+
+### Part d --- Errors in iteration with `safely`
+
+Iterating over messy data, one bad element can blow up the whole loop:
+
+```{r}
+x <- list(1, 10, "3", 7)
+```
+
+```{r eval=FALSE}
+map(x, log)   # errors on the character element "3"
+```
+
+Use `safely(log)` with `map` to apply `log` to every element of `x`
+without crashing. Then use `transpose` to split the results into a
+`$result` part and an `$error` part, and report which element(s) of `x`
+caused an error.
+
+```{r}
+
+```
+
+## Reflection (10 points)
+
+This section is graded on the substance of your answers, not on getting
+the "right" answer. Aim for a few honest sentences each. One-word
+answers will not earn full credit.
+
+### 1. Hardest moment (3 points)
+
+Which part of this homework took the longest, or where did you get most
+stuck? Describe specifically what was confusing and how you got unstuck.
+
+### 2. Reading a regex (3 points)
+
+Pick one regular expression you wrote in Question 1 and explain, piece by
+piece, what each part of the pattern matches. Pretend you're explaining
+it to a classmate who has never seen a backreference.
+
+### 3. Loop vs. map (2 points)
+
+In Question 3 you wrote the same column-class computation as both a `for`
+loop (a) and a `map_chr` call (b). In a sentence or two, when do you
+think a `for` loop is the clearer choice, and when is `map` clearer?
+
+### 4. A question for class (2 points)
+
+One question you would want to ask in class about regular expressions,
+factors, or iteration.
