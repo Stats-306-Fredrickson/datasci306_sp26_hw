@@ -1,0 +1,350 @@
+---
+title: "DATASCI 306, Spring 2026, Homework 6"
+author: "Your name, Your uniqname"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(bench)
+library(parallel)
+library(foreach)
+library(doParallel)
+# profvis is used in the Console only (its output is interactive and does not
+# knit into a PDF), so we do not load it here.
+```
+
+This homework covers material from Lectures 20, 21, and 22: **debugging**
+and the three signal levels (`message`, `warning`, `stop`, plus
+`traceback` and `browser`); measuring performance
+by **profiling** (`profvis`) and **benchmarking** (`bench::mark`); and
+**parallel programming** with the `parallel` and `foreach`/`doParallel`
+packages (`makeCluster`, `parLapply`, `clusterSplit`,
+`foreach` with `%do%`/`%dopar%`), reasoned about with Amdahl's Law.
+
+**Grading.** Same scheme as previous homeworks:
+
+- **Code questions (Q1--Q3): completion.** Attempt every part in good
+  faith. Code that runs and shows you engaged with the question earns
+  full credit.
+- **Reflection: points.** The reflection at the end is graded on the
+  substance of your answers (10 points total).
+
+A few parts ask you to run something **in the Console** (profiling output
+and some parallel code are awkward or impossible to knit) and then
+**write up** what you saw. For those parts, the credit is in your written
+description, not in evaluated chunk output.
+
+### Submission checklist
+
+Before submitting, confirm:
+
+- [ ] You replaced the name and uniqname in the YAML header.
+- [ ] The document knits to PDF without errors.
+- [ ] Every R chunk has been run and shows output where output is expected.
+- [ ] You answered the reflection at the bottom of the document.
+
+## Question 1: Debugging and signaling
+
+### Part a --- Finding the bug in a call stack
+
+The file `score_report.R` (in this folder) defines a small four-step
+pipeline that should turn a vector of exam scores into a table of
+letter-grade counts: `score_report` calls `grade_all`, which calls
+`grade_one`, which calls `letter_grade`. 
+
+As written it throws an error. The chunk below loads the file and runs it;
+it has `eval = FALSE` so this document still knits:
+
+```{r, eval = FALSE}
+source("score_report.R")
+score_report(c(95, 83, 72, 60, 88, 91))
+# Error in if (score >= 90) { : the condition has length > 1
+```
+
+Run the call **in the Console** and use R's debugging tools (start with
+`traceback()`) to work out where the error really comes from --- keeping in
+mind the Lecture 20 warning that the line an error is *raised* on is not
+always where the bug actually *is*. Write a few sentences explaining what
+is going wrong, then fix `score_report.R` and show your corrected pipeline
+works by setting `eval = TRUE` in the chunk above.
+
+### Part b --- Setting a breakpoint with `browser()`
+
+This bug is sneakier than part a: nothing errors and nothing warns, the
+answer is just **wrong**. The function below is meant to return the
+*running maximum* of a vector --- at each position, the largest value seen
+so far --- so `running_max(c(3, 1, 4, 1, 5))` should give
+`c(3, 3, 4, 4, 5)`.
+
+```{r}
+running_max <- function(x) {
+  best <- 0
+  out <- numeric(length(x))
+  for (i in seq_along(x)) {
+    if (x[i] > best) {
+      best <- x[i]
+    }
+    out[i] <- best
+  }
+  out
+}
+
+running_max(c(-5, -3, -8, -1))   # should be c(-5, -3, -3, -1)
+```
+
+The output above is clearly wrong, but there is no error message to read
+and no stack to trace --- you need to watch the function's *state* as it
+runs. That is what a **breakpoint** is for. In Lecture 20 we used
+`browser()`: drop a call to `browser()` inside the function (e.g. as the
+first line of the loop body) and R will pause there each time it is
+reached, dropping you into an interactive prompt where you can inspect
+variables and step with `n` (next), `c` (continue), and `Q` (quit).
+
+**In the Console**, add a `browser()` to `running_max`, run
+`running_max(c(-5, -3, -8, -1))`, and step through the first couple of
+iterations. Inspect `best` and `x[i]` at the breakpoint. Then write up:
+what is the value of `best`, why does the `if` condition never become
+`TRUE` for this input, and what one-line change to the function fixes it?
+
+```
+Write your findings here (a few sentences).
+
+
+
+```
+
+Finally, write the corrected `running_max` in the chunk below and verify
+it returns `c(-5, -3, -3, -1)` on the negative input *and* `c(3, 3, 4, 4, 5)`
+on `c(3, 1, 4, 1, 5)`.
+
+```{r}
+
+```
+
+### Part c --- Defensive programming with all three signals
+
+Write a function `clean_heights(x)` that cleans a vector of human heights
+recorded **in centimeters**, using each of R's three signal levels:
+
+- emit a **`message`** reporting how many values it is cleaning,
+- if any value is **negative**, raise a **`warning`** and replace those
+  values with `NA`,
+- if any value (ignoring `NA`s) is greater than `300`, **`stop`** with an
+  informative error (no human is 3 m tall, so this indicates bad data).
+
+Return the cleaned vector. Demonstrate it on `c(170, 165, -5, 182)`
+(which should warn and return an `NA`), and show in an `eval = FALSE`
+chunk that `clean_heights(c(170, 999))` stops.
+
+```{r}
+
+```
+
+## Question 2: Profiling and benchmarking
+
+The pipeline below computes a few summaries of the spread of a numeric
+vector: it centers the values, squares the centered values with the helper
+`square_all`, and then reports the count, the variance, and the largest
+squared deviation.
+
+```{r}
+square_all <- function(x) {
+  out <- c()
+  for (v in x) {
+    out <- c(out, v^2)
+  }
+  out
+}
+
+analyze_spread <- function(x) {
+  centered <- x - mean(x)
+  sq <- square_all(centered)
+  c(n        = length(x),
+    variance = sum(sq) / (length(x) - 1),
+    max_sq   = max(sq))
+}
+
+analyze_spread(rnorm(2000))
+```
+
+### Part a --- Profile the pipeline and find the hot spot
+
+`analyze_spread` does several things; only one of them is slow. **In the
+Console** (profiling output is interactive and does not knit), profile a
+larger run and find out which step dominates:
+
+```{r, eval = FALSE}
+library(profvis)
+profvis(analyze_spread(rnorm(50000)))
+```
+
+Write up which function --- and which *line* of it --- accounts for almost
+all of the time, what role `<GC>` plays, and what specifically about that
+line makes it slow.
+
+```
+Write your findings here.
+
+
+
+```
+
+### Part b --- Write a faster replacement
+
+Rewrite the slow helper as `square_all_fast(x)` so the pipeline no longer
+has that bottleneck. Verify your version returns the same result as the
+original `square_all` on a small input.
+
+```{r}
+
+```
+
+### Part c --- Benchmark
+
+Use `bench::mark` to compare the original `square_all` against your
+`square_all_fast` on a sizable input (say `rnorm(20000)`). Report the
+result, and using the **median** column (Lecture 20 notes `min`/`median`
+are the most trustworthy), state roughly how many times faster your version
+is.
+
+```{r}
+
+```
+
+## Question 3: Parallel programming
+
+### Part a --- Amdahl's Law
+
+Amdahl's Law gives the speedup $S$ from parallelizing a fraction $p$ of a
+program across $k$ processors:
+
+$$S = \frac{1}{1 - p + p/k}.$$
+
+Write a function `amdahl(p, k)` that returns $S$, then use it to fill in
+the speedups for these three scenarios:
+
+| scenario | $p$  | $k$ |
+|----------|------|-----|
+| A        | 0.90 | 4   |
+| B        | 0.90 | 8   |
+| C        | 0.50 | 8   |
+
+Comparing A vs B (more processors) and B vs C (more of the program made
+parallel), which lever buys more speedup here? Answer in a sentence.
+
+```{r}
+
+```
+
+### Part b --- When does parallelism actually pay off?
+
+Part a's formula assumes parallelizing is free. It is not: starting workers
+and shipping each task to them costs time, and that fixed **overhead** only
+pays off when each task does enough real work. We will measure where that
+break-even point is.
+
+The function below approximates $\pi$ with the Leibniz series
+$\pi = 4\sum_{k=0}^{N-1} \frac{(-1)^k}{2k+1}$. The number of terms `n_terms`
+is a dial for how much work one call does: more terms means a more accurate
+answer and more computation.
+
+```{r}
+pi_series <- function(n_terms) {
+  k <- 0:(n_terms - 1)
+  4 * sum((-1)^k / (2 * k + 1))
+}
+
+pi_series(1e6)
+```
+
+Computing several independent approximations is embarrassingly parallel.
+Set up a 2-worker cluster and **export** `pi_series` to it:
+
+```{r}
+cl <- makeCluster(2)
+clusterExport(cl, "pi_series")
+```
+
+For each value of `n_terms` in `c(10, 1000, 1e5, 1e6, 1e7)`, use
+`bench::mark` (with `check = FALSE, memory = FALSE, filter_gc = FALSE`) to
+time computing
+**eight** approximations *serially* with `lapply(1:8, ...)` against *in
+parallel* with `parLapply(cl, 1:8, ...)`. Collect the **median** of each
+into a table with columns `n_terms`, `serial`, `parallel`, and
+`speedup = serial / parallel` (a `map`/`map_dfr` over the `n_terms` values
+is a clean way to build it). Then `stopCluster(cl)`.
+
+Report your table. In a few sentences: at small `n_terms`, is the parallel
+version faster or *slower* than serial, and why? As `n_terms` grows, what
+does the speedup approach, and why can't it exceed that? Connect both ends
+to the overhead term that Amdahl's Law from part a leaves out.
+
+```{r pi-sweep, cache = TRUE}
+
+```
+
+### Part c --- Split--apply--combine with `foreach`
+
+Not every problem can be easily parallelized using tools like `parLapply`. To compute a single
+aggregate across a vector in parallel, the pattern is **split** the data
+into chunks, **apply** a per-chunk computation, then **combine** the
+chunk results.
+
+In part b each task computed a *whole* approximation of $\pi$. Here we go
+the other way: take a **single** Leibniz approximation and split *it* across
+workers. Because the approximation is a sum over the term indices
+$k = 0, 1, \ldots, N-1$, and a sum can be broken into pieces, we can sum
+each block of indices on its own worker and then add the block totals.
+
+Implement this split--apply--combine for `N <- 1e7`:
+
+- **Apply:** write `leibniz_chunk(ks)` returning the partial sum
+  $\sum_{k \in ks} \frac{(-1)^k}{2k+1}$ over a vector of term indices `ks`.
+- **Split:** make a 2-worker cluster and use `clusterSplit(cl, 0:(N - 1))`
+  to break the indices into one chunk per worker.
+- **Combine:** iterate over the chunks with `foreach`, applying
+  `leibniz_chunk` to each and passing the `+` operator as `.combine` so the
+  partial sums are added; multiply the combined total by 4 to get $\pi$.
+
+Use `%do%` so the document knits reliably (register the cluster with
+`registerDoParallel(cl)` and switch to `%dopar%` if you want the chunks to
+actually run on the workers). Verify your result matches `pi_series(N)`
+from part b, then `stopCluster(cl)`.
+
+```{r}
+
+```
+
+## Reflection (10 points)
+
+This section is graded on the substance of your answers, not on getting
+the "right" answer. Aim for a few honest sentences each. One-word answers
+will not earn full credit.
+
+### 1. Hardest moment (3 points)
+
+Which part of this homework took the longest, or where did you get most
+stuck? Describe specifically what was confusing and how you got unstuck.
+
+### 2. A bug of your own (3 points)
+
+Think of a bug you have hit in your own R code this term (a confusing
+error, a wrong answer, a warning you ignored). Which of the Lecture 20
+strategies --- searching, shrinking to a small example, locating it in the
+call stack with `traceback()`, or pausing to inspect state with a
+`browser()` breakpoint --- would have helped you find it fastest, and why?
+
+### 3. To parallelize or not (2 points)
+
+In Question 3 you saw both a real speedup and a case where parallelism made
+things slower. In your own words, what has to be true about a task before
+reaching for parallel code is worth it?
+
+### 4. A question for class (2 points)
+
+One question you would want to ask in class about debugging, profiling, or
+parallel programming.
