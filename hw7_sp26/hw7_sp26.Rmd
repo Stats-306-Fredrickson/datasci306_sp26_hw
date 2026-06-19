@@ -1,0 +1,217 @@
+---
+title: "DATASCI 306, Spring 2026, Homework 7"
+author: "Your name, Your uniqname"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(DBI)
+library(duckdb)
+library(dbplyr)
+```
+
+This homework covers material from Lectures 23--25 (**Shiny** and reactive
+programming) and Lecture 28 (**databases and SQL**). It is the capstone for
+the course: you will use **DuckDB** to query a data file with SQL, answer
+questions about it by **joining tables**, and then wire those same queries
+into a live **Shiny** app --- an interactive version of the "Six Degrees of
+Kevin Bacon" game.
+
+**Grading.** Same scheme as previous homeworks:
+
+- **Code questions (Q1--Q3): completion.** Attempt every part in good faith.
+  Code that runs and shows you engaged with the question earns full credit.
+- **Reflection: points.** The reflection at the end is graded on the
+  substance of your answers (10 points total).
+
+Question 3 is built in a separate `.R` file (a Shiny app cannot be knit into
+a PDF), which is pulled into this document automatically. The credit there is
+in completing the app, which you test by running it.
+
+## Background: the data
+
+The file `data/movie_actors.parquet` is a table of actor--movie pairs: each row
+records that a particular `actor` appeared in a particular `movie`. Movie
+titles carry their release year as a suffix, e.g. `Footloose (1984)`.
+
+Recall from Lecture 28 that **DuckDB can query a file directly**, and that
+**Parquet** is a columnar, compressed, binary file format. You point `FROM` at
+the `.parquet` file and DuckDB reads only what it needs, without importing
+anything into the database. We will do everything that way --- query the file
+in place rather than loading it into R: just `FROM 'data/movie_actors.parquet'`.
+
+---
+
+## Question 1 (3 points): Querying a file with DuckDB
+
+**(a)** Open an in-memory DuckDB connection (this is just the query *engine* ---
+no data is stored in it). Then take a first look at the file by selecting its
+first 5 rows directly.
+
+```{r}
+
+```
+
+**(b)** Using **SQL**, answer these warm-up questions about the file:
+
+1. How many distinct actors and how many distinct movies are in the data?
+2. How many movies does Kevin Bacon appear in?
+3. Which five movies have the largest casts?
+
+```{r}
+
+```
+
+**(c)** List the movies Kevin Bacon appeared in, **oldest first**. The year is
+the four digits inside the `(YYYY)` suffix; pull it out in SQL with
+`regexp_extract(movie, '(\d{4})\)$', 1)` and `TRY_CAST(... AS INTEGER)`.
+
+```{r}
+
+```
+
+---
+
+## Question 2 (5 points): Joining tables
+
+This is the heart of the homework. Two actors are **co-stars** if they appear
+in the *same* movie --- which we find by joining the table **to itself**.
+
+**(a) A self-join.** Join `'data/movie_actors.parquet'` to itself: alias one copy
+`a` and another `b`, match rows with the same `movie` but a different `actor`,
+and the `b.actor` values are the co-stars of the `a.actor` values. Find Kevin
+Bacon's top 10 co-stars --- the actors who share the most movies with him.
+
+```{r}
+
+```
+
+**(b) The same join, no `WHERE`.** Drop the filter on Kevin Bacon and ask the
+question for *everyone*: which 10 actors have the most distinct co-stars in the
+whole data set? (Use `COUNT(DISTINCT b.actor)`.)
+
+```{r}
+
+```
+
+**(c) The same query with `dbplyr`.** Writing SQL by hand is one option;
+`dbplyr` is the other. Give the file a name DuckDB can refer to with a **view**
+(a saved query --- it still reads the file, nothing is copied in), point
+`tbl()` at it, and write the co-star query as a `dplyr` pipeline. Confirm the
+generated SQL with `show_query()`, then `collect()` the top 10.
+
+```{r}
+
+```
+
+---
+
+## Question 3 (6 points): The Six Degrees of Kevin Bacon game
+
+The **Six Degrees of Kevin Bacon** is a trivia game built on the claim that any
+film actor can be linked to Kevin Bacon through a short chain of shared movie
+appearances: an actor's "Bacon number" is the number of steps in the shortest
+such chain (Bacon himself is 0, anyone who acted with him is 1, and so on). The
+game has a well-known online version, the **Oracle of Bacon**
+(<https://oracleofbacon.org/>), and its own
+[Wikipedia article](https://en.wikipedia.org/wiki/Six_Degrees_of_Kevin_Bacon).
+
+You will build a playable version as a **Shiny** app. The player starts from a
+random actor and walks toward Kevin Bacon: pick an actor, see their movies;
+pick a movie, see its cast; repeat until you reach Bacon (win) or run out of
+six steps (lose).
+
+A starter file `bacon_app.R` is provided. Its data section is already written
+for you, and it is worth reading closely: the helper functions `get_movies()`
+and `get_cast()` are **SQL queries that DuckDB runs directly against the
+Parquet file** --- the same `FROM 'data/movie_actors.parquet'` pattern from
+Questions 1--2.
+This is the payoff of the hybrid: the app's data layer is SQL, and the
+interactivity is Shiny.
+
+**Your job is to fill in the server logic** --- the four `# TODO` blocks inside
+the `server` function. Do not modify the data section, the helpers, or the UI.
+
+1. **TODO 1 --- `observeEvent(input$new_game, ...)`:** Reset the game state and
+   sample 5 random starting actors, weighted by number of movies (pass
+   `prob = actor_weights` to `sample()`). Use `updateRadioButtons()` to set the
+   choices for `"selection"`.
+
+2. **TODO 2 --- `observeEvent(input$choose, ...)`:** The main game logic. In the
+   `"actor"` phase, record the actor, increment the step, check win/loss, then
+   look up their movies with `get_movies()` (minus `game$visited_movies`) and
+   switch to the `"movie"` phase. In the `"movie"` phase, record the movie (and
+   add it to `game$visited_movies`), look up the cast with `get_cast()` (minus
+   `game$visited`), and switch back to `"actor"`.
+
+3. **TODO 3 --- `output$path_display`:** With `renderUI()`, show the path so far,
+   actors in **bold** and movies in *italics*, separated by arrows.
+
+4. **TODO 4 --- `output$result_message`:** With `renderText()`, show a win
+   message (with the Bacon number), a loss message, or nothing.
+
+### Provided helpers (already in the file)
+
+- `get_movies(actor_name)` --- a SQL query returning an actor's movies, oldest
+  first
+- `get_cast(movie_name)` --- a SQL query returning the actors in a movie
+- `non_bacon_actors` --- every actor except Kevin Bacon
+- `actor_weights` --- movie counts per actor (use as `prob =` when sampling)
+
+### Hints
+
+- `updateRadioButtons(session, "selection", choices = new_vector)` changes the
+  options; `session` is a parameter of the server function.
+- `game$phase` is `"actor"` or `"movie"` --- check it to decide what to do.
+- `game$visited` / `game$visited_movies` track what has been used; remove them
+  with `setdiff()`.
+- `game$step` counts *actor* selections only; the game ends at 6.
+- Guard the choose handler with `req(game$active, input$selection)`.
+- For the path, odd indices of `game$path` are actors, even indices are movies.
+
+Test with `shiny::runApp("bacon_app.R")`. Your completed code is included
+automatically below:
+
+```{r, code=readLines("bacon_app.R"), eval=FALSE}
+```
+
+---
+
+## Reflection (10 points)
+
+This section is graded on the substance of your answers, not on getting the
+"right" answer. Aim for a few honest sentences each. One-word answers will not
+earn full credit.
+
+### 1. Hardest moment (3 points)
+
+Which part of this homework took the longest, or where did you get most stuck?
+Describe specifically what was confusing and how you got unstuck.
+
+### 2. SQL vs. doing it in R (3 points)
+
+In Question 2 you found co-stars with a SQL self-join that DuckDB runs against
+the file. You could instead read the whole file into R first and compute
+co-stars with `dplyr`. For a file of a few hundred million rows, which approach
+is better, and why? Use the words *lazy* and *collect* in your answer.
+
+### 3. Reactivity (2 points)
+
+The Shiny app stores the game in `reactiveValues` and changes the radio-button
+choices from inside an `observeEvent`. In your own words, why does the app need
+*reactive* state here instead of ordinary R variables?
+
+### 4. A question for class (2 points)
+
+One question you would want to ask in class about SQL, databases, or Shiny.
+
+---
+
+### What to submit
+
+- This file, knit to PDF (`hw7_sp26.Rmd` --> `hw7_sp26.pdf`).
+- Your completed `bacon_app.R`.
